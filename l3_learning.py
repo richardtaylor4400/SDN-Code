@@ -112,6 +112,25 @@ class l3_switch (EventMixin):
 
     self.listenTo(core)
 	
+  def blockPacket(self,packet,event):
+    blacklisted = "10.0.0.1" ###change this for IP or stick it in a list and loop selected IP addresses
+    if packet.next.srcip == blacklisted or packet.next.dstip ==blacklisted:
+        log.warning("blocked IP")
+        inport = event.port
+        actions = []
+        actions.append(of.ofp_action_output(port = of.OFPP_NONE))
+        msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
+                                idle_timeout=FLOW_IDLE_TIMEOUT,
+                                hard_timeout=of.OFP_FLOW_PERMANENT,
+                                buffer_id=event.ofp.buffer_id,
+                                actions=actions,
+                                match=of.ofp_match.from_packet(packet,
+                                                               inport))
+        event.connection.send(msg)
+        return True
+    else:
+        return False
+
   def _handle_expiration (self):
     # Called by a timer so that we can remove old items.
     empty = []
@@ -192,19 +211,8 @@ class l3_switch (EventMixin):
       dstaddr = packet.next.dstip
       
       
-      blacklisted = "10.0.0.1" ###change this for IP or stick it in a list and loop selected IP addresses
-      if packet.next.srcip == blacklisted or packet.next.dstip ==blacklisted:
-        log.warning("blocked IP")
-        actions = []
-        actions.append(of.ofp_action_output(port = of.OFPP_NONE))
-        msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
-                                idle_timeout=FLOW_IDLE_TIMEOUT,
-                                hard_timeout=of.OFP_FLOW_PERMANENT,
-                                buffer_id=event.ofp.buffer_id,
-                                actions=actions,
-                                match=of.ofp_match.from_packet(packet,
-                                                               inport))
-        event.connection.send(msg)
+      Packetblocked = self.blockPacket(packet,event)
+      if Packetblocked:
         return
 
 
