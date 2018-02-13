@@ -187,14 +187,27 @@ class l3_switch (EventMixin):
         log.debug("%i %i learned %s", dpid,inport,str(packet.next.srcip))
       self.arpTable[dpid][packet.next.srcip] = Entry(inport, packet.src)
       
-      blacklisted = "10.0.0.1"
-      if packet.next.srcip == blacklisted:
-        log.warning("blocked IP")
-        return
-
 
       # Try to forward
       dstaddr = packet.next.dstip
+      
+      
+      blacklisted = "10.0.0.1" ###change this for IP or stick it in a list and loop selected IP addresses
+      if packet.next.srcip == blacklisted or packet.next.dstip ==blacklisted:
+        log.warning("blocked IP")
+        actions = []
+        actions.append(of.ofp_action_output(port = of.OFPP_NONE))
+        msg = of.ofp_flow_mod(command=of.OFPFC_ADD,
+                                idle_timeout=FLOW_IDLE_TIMEOUT,
+                                hard_timeout=of.OFP_FLOW_PERMANENT,
+                                buffer_id=event.ofp.buffer_id,
+                                actions=actions,
+                                match=of.ofp_match.from_packet(packet,
+                                                               inport))
+        event.connection.send(msg)
+        return
+
+
       if dstaddr in self.arpTable[dpid]:
         # We have info about what port to send it out on...
 
